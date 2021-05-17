@@ -211,6 +211,58 @@ class TaskDict(object):
         task = self[prefix]
         print(task['text'])
 
+    def add_tag(self, task, tag):
+        """Add tag to the the task with the given prefix.
+
+        If more than one task matches the prefix an AmbiguousPrefix exception
+        will be raised, unless the prefix is the entire ID of one task.
+
+        If no tasks match the prefix an UnknownPrefix exception will be raised.
+
+        """
+        if 'tags' in task:
+            tags = task['tags'].strip().split('/')
+            if tag not in tags:
+                task['tags'] += "/" + tag
+        else:
+            task['tags'] = tag
+
+    def remove_tag(self, task, tag):
+        """Remove tag to the the task with the given prefix.
+
+        If more than one task matches the prefix an AmbiguousPrefix exception
+        will be raised, unless the prefix is the entire ID of one task.
+
+        If no tasks match the prefix an UnknownPrefix exception will be raised.
+
+        """
+        if 'tags' in task:
+            tags = task['tags'].strip().split('/')
+            if tag in tags:
+                tags.remove(tag)
+                task['tags'] = '/'.join(t for t in tags)
+        if len(task['tags']) == 0:
+            del task['tags']
+
+    def tag(self, prefix, tags):
+        """Add (or remove) tag to the the task with the given prefix.
+
+        If more than one task matches the prefix an AmbiguousPrefix exception
+        will be raised, unless the prefix is the entire ID of one task.
+
+        If no tasks match the prefix an UnknownPrefix exception will be raised.
+
+        """
+
+        task = self[prefix]
+        for tag in tags.strip().split(' '):
+            if not tag:
+                continue
+            elif tag[0] == '-':
+                self.remove_tag(task, tag[1:])
+            else:
+                self.add_tag(task, tag)
+
     def finish_task(self, prefix):
         """Mark the task with the given prefix as finished.
 
@@ -246,7 +298,12 @@ class TaskDict(object):
         for _, task in sorted(tasks.items()):
             if grep.lower() in task['text'].lower():
                 p = '%s - ' % task[label].ljust(plen) if not quiet else ''
-                print(p + task['text'])
+                if 'tags' in task:
+                    tags = task['tags'].strip().split('/')
+                    tags_str = " " + " ".join(["[%s]" % tag for tag in tags])
+                else:
+                    tags_str = ""
+                print(p + task['text'] + tags_str)
 
     def write(self, delete_if_empty=False):
         """Flush the finished and unfinished tasks to the files on disk."""
@@ -287,6 +344,8 @@ def _build_parser():
                        help="Remove TASK from list", metavar="TASK")
     actions.add_option("-s", "--show", dest="show",
                        help="show TASK from list", metavar="TASK")
+    actions.add_option("-x", "--tag", dest="tag",
+                       help="add tag to TASK", metavar="TASK")
     parser.add_option_group(actions)
 
     config = OptionGroup(parser, "Configuration Options")
@@ -337,6 +396,9 @@ def _main():
             td.write(options.delete)
         elif options.show:
             td.show_task(options.show)
+        elif options.tag:
+            td.tag(options.tag, text)
+            td.write(options.delete)
         elif text:
             td.add_task(text, verbose=options.verbose, quiet=options.quiet)
             td.write(options.delete)
