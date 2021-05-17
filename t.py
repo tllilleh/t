@@ -4,7 +4,7 @@
 
 from __future__ import with_statement, print_function
 
-import os, re, sys, hashlib
+import os, re, sys, hashlib, time
 from operator import itemgetter
 from optparse import OptionParser, OptionGroup
 
@@ -38,7 +38,7 @@ def _hash(text):
     Currently SHA1 hashing is used.  It should be plenty for our purposes.
 
     """
-    return hashlib.sha1(text.encode('utf-8')).hexdigest()
+    return hashlib.sha1((str(time.time()) + text).encode('utf-8')).hexdigest()
 
 def _task_from_taskline(taskline):
     """Parse a taskline (from a task file) and return a task.
@@ -197,7 +197,8 @@ class TaskDict(object):
             text = re.sub(find, repl, task['text'])
 
         task['text'] = text
-        task['id'] = _hash(text)
+        if 'id' not in task:
+            task['id'] = _hash(text)
 
     def show_task(self, prefix):
         """Show the task with the given prefix.
