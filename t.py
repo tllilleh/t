@@ -68,6 +68,10 @@ def _task_from_taskline(taskline):
     else:
         text = taskline.strip()
         task = { 'id': _hash(text), 'text': text }
+
+    if 'timestamp' not in task:
+        task['timestamp'] = 0
+
     return task
 
 def _tasklines_from_tasks(tasks):
@@ -172,7 +176,8 @@ class TaskDict(object):
     def add_task(self, text, verbose, quiet):
         """Add a new, unfinished task with the given summary text."""
         task_id = _hash(text)
-        self.tasks[task_id] = {'id': task_id, 'text': text}
+        timestamp = time.time()
+        self.tasks[task_id] = {'id': task_id, 'text': text, 'timestamp': timestamp}
 
         if not quiet:
             if verbose:
@@ -296,7 +301,7 @@ class TaskDict(object):
                 tasks[task_id]['prefix'] = prefix
 
         plen = max(map(lambda t: len(t[label]), tasks.values())) if tasks else 0
-        for _, task in sorted(tasks.items()):
+        for task in sorted(tasks.values(), key=lambda t:t['timestamp']):
             if grep.lower() in task['text'].lower():
                 p = '%s - ' % task[label].ljust(plen) if not quiet else ''
                 if 'tags' in task:
