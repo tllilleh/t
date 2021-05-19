@@ -72,6 +72,11 @@ def _task_from_taskline(taskline):
     if 'timestamp' not in task:
         task['timestamp'] = 0
 
+    if 'show_full_id' not in task:
+        task['show_full_id'] = False
+    else:
+        task['show_full_id'] = task['show_full_id'] == "True"
+
     return task
 
 def _tasklines_from_tasks(tasks):
@@ -173,14 +178,21 @@ class TaskDict(object):
         else:
             raise AmbiguousPrefix(prefix)
 
-    def add_task(self, text, verbose, quiet):
+    def add_task(self, text, verbose, quiet, task_id = None):
         """Add a new, unfinished task with the given summary text."""
-        task_id = _hash(text)
+        if not task_id:
+            task_id = _hash(text)
+            show_full_id = False
+        else:
+            show_full_id = True
         timestamp = time.time()
         self.tasks[task_id] = {'id': task_id, 'text': text, 'timestamp': timestamp}
 
+        if show_full_id:
+            self.tasks[task_id]['show_full_id'] = show_full_id
+
         if not quiet:
-            if verbose:
+            if verbose or show_full_id:
                 print(task_id)
             else:
                 prefixes = _prefixes(self.tasks)
@@ -298,7 +310,10 @@ class TaskDict(object):
 
         if not verbose:
             for task_id, prefix in _prefixes(tasks).items():
-                tasks[task_id]['prefix'] = prefix
+                if tasks[task_id]['show_full_id']:
+                    tasks[task_id]['prefix'] = task_id
+                else:
+                    tasks[task_id]['prefix'] = prefix
 
         plen = max(map(lambda t: len(t[label]), tasks.values())) if tasks else 0
         for task in sorted(tasks.values(), key=lambda t:t['timestamp']):
@@ -342,6 +357,8 @@ def _build_parser():
 
     actions = OptionGroup(parser, "Actions",
         "If no actions are specified the TEXT will be added as a new task.")
+    actions.add_option("-a", "--add", dest="add", default="",
+                       help="add TASK with TEXT", metavar="TASK")
     actions.add_option("-e", "--edit", dest="edit", default="",
                        help="edit TASK to contain TEXT", metavar="TASK")
     actions.add_option("-f", "--finish", dest="finish",
@@ -404,6 +421,9 @@ def _main():
             td.show_task(options.show)
         elif options.tag:
             td.tag(options.tag, text)
+            td.write(options.delete)
+        elif options.add:
+            td.add_task(text, verbose=options.verbose, quiet=options.quiet, task_id=options.add)
             td.write(options.delete)
         elif text:
             td.add_task(text, verbose=options.verbose, quiet=options.quiet)
