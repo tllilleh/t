@@ -321,10 +321,10 @@ class TaskDict(object):
                 p = '%s - ' % task[label].ljust(plen) if not quiet else ''
                 if 'tags' in task:
                     tags = task['tags'].strip().split('/')
-                    tags_str = " " + " ".join(["[%s]" % tag for tag in tags])
+                    tags_str = " ".join(["[%s]" % tag for tag in tags]) + " "
                 else:
                     tags_str = ""
-                print(p + task['text'] + tags_str)
+                print(p + tags_str + task['text'])
 
     def write(self, delete_if_empty=False):
         """Flush the finished and unfinished tasks to the files on disk."""
