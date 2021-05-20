@@ -60,7 +60,7 @@ def _task_from_taskline(taskline):
     if taskline.strip().startswith('#'):
         return None
     elif '|' in taskline:
-        text, _, meta = taskline.rpartition('|')
+        text, _, meta = taskline.partition('|')
         task = json.loads(meta)
         task['text'] = text.strip()
     else:
