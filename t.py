@@ -7,7 +7,7 @@ from __future__ import with_statement, print_function
 import os, re, sys, hashlib, time
 from operator import itemgetter
 from optparse import OptionParser, OptionGroup
-
+import json
 
 class InvalidTaskfile(Exception):
     """Raised when the path to a task file already exists as a directory."""
@@ -45,7 +45,7 @@ def _task_from_taskline(taskline):
 
     A taskline should be in the format:
 
-        summary text ... | meta1:meta1_value,meta2:meta2_value,...
+        summary text ... | {json of metadata}
 
     The task returned will be a dictionary such as:
 
@@ -61,10 +61,8 @@ def _task_from_taskline(taskline):
         return None
     elif '|' in taskline:
         text, _, meta = taskline.rpartition('|')
-        task = { 'text': text.strip() }
-        for piece in meta.strip().split(','):
-            label, data = piece.split(':')
-            task[label.strip()] = data.strip()
+        task = json.loads(meta)
+        task['text'] = text.strip()
     else:
         text = taskline.strip()
         task = { 'id': _hash(text), 'text': text }
@@ -74,8 +72,6 @@ def _task_from_taskline(taskline):
 
     if 'show_full_id' not in task:
         task['show_full_id'] = False
-    else:
-        task['show_full_id'] = task['show_full_id'] == "True"
 
     return task
 
@@ -85,9 +81,16 @@ def _tasklines_from_tasks(tasks):
     tasklines = []
 
     for task in tasks:
-        meta = [m for m in task.items() if m[0] != 'text']
-        meta_str = ', '.join('%s:%s' % m for m in meta)
-        tasklines.append('%s | %s\n' % (task['text'], meta_str))
+        meta = dict(task)
+
+        # remove text as it isn't part of the metadata
+        del meta['text']
+
+        # don't add show_full_id if it is false
+        if 'show_full_id' in meta and not meta['show_full_id']:
+            del meta['show_full_id']
+
+        tasklines.append('%s | %s\n' % (task['text'], json.dumps(meta)))
 
     return tasklines
 
@@ -239,11 +242,9 @@ class TaskDict(object):
 
         """
         if 'tags' in task:
-            tags = task['tags'].strip().split('/')
-            if tag not in tags:
-                task['tags'] += "/" + tag
+            task['tags'].append(tag)
         else:
-            task['tags'] = tag
+            task['tags'] = [tag]
 
     def remove_tag(self, task, tag):
         """Remove tag to the the task with the given prefix.
@@ -255,10 +256,8 @@ class TaskDict(object):
 
         """
         if 'tags' in task:
-            tags = task['tags'].strip().split('/')
-            if tag in tags:
-                tags.remove(tag)
-                task['tags'] = '/'.join(t for t in tags)
+            task['tags'].remove(tag)
+
         if len(task['tags']) == 0:
             del task['tags']
 
@@ -320,8 +319,7 @@ class TaskDict(object):
             if grep.lower() in task['text'].lower():
                 p = '%s - ' % task[label].ljust(plen) if not quiet else ''
                 if 'tags' in task:
-                    tags = task['tags'].strip().split('/')
-                    tags_str = " ".join(["[%s]" % tag for tag in tags]) + " "
+                    tags_str = " ".join(["[%s]" % tag for tag in task['tags']]) + " "
                 else:
                     tags_str = ""
                 print(p + tags_str + task['text'])
