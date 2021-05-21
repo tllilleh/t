@@ -80,6 +80,8 @@ def _tasklines_from_tasks(tasks):
 
     tasklines = []
 
+    textlen = max(map(lambda t: len(t['text']), tasks)) if tasks else 0
+
     for task in tasks:
         meta = dict(task)
 
@@ -90,7 +92,7 @@ def _tasklines_from_tasks(tasks):
         if 'show_full_id' in meta and not meta['show_full_id']:
             del meta['show_full_id']
 
-        tasklines.append('%s | %s\n' % (task['text'], json.dumps(meta)))
+        tasklines.append('%s | %s\n' % (task['text'].ljust(textlen), json.dumps(meta, sort_keys=True)))
 
     return tasklines
 
