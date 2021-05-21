@@ -73,6 +73,9 @@ def _task_from_taskline(taskline):
     if 'show_full_id' not in task:
         task['show_full_id'] = False
 
+    if 'parent_id' not in task:
+        task['parent_id'] = None
+
     return task
 
 def _tasklines_from_tasks(tasks):
@@ -91,6 +94,10 @@ def _tasklines_from_tasks(tasks):
         # don't add show_full_id if it is false
         if 'show_full_id' in meta and not meta['show_full_id']:
             del meta['show_full_id']
+
+        # don't add parent_id if it is None
+        if 'parent_id' in meta and meta['parent_id'] == None:
+            del meta['parent_id']
 
         tasklines.append('%s | %s\n' % (task['text'].ljust(textlen), json.dumps(meta, sort_keys=True)))
 
@@ -183,18 +190,26 @@ class TaskDict(object):
         else:
             raise AmbiguousPrefix(prefix)
 
-    def add_task(self, text, verbose, quiet, task_id = None):
+    def add_task(self, text, verbose, quiet, task_id = None, parent_id = None):
         """Add a new, unfinished task with the given summary text."""
         if not task_id:
             task_id = _hash(text)
             show_full_id = False
         else:
             show_full_id = True
+
+        if parent_id:
+            parent = self[parent_id]
+            parent_id = parent['id']
+
         timestamp = time.time()
         self.tasks[task_id] = {'id': task_id, 'text': text, 'timestamp': timestamp}
 
         if show_full_id:
             self.tasks[task_id]['show_full_id'] = show_full_id
+
+        if parent_id:
+            self.tasks[task_id]['parent_id'] = parent_id
 
         if not quiet:
             if verbose or show_full_id:
@@ -221,18 +236,6 @@ class TaskDict(object):
         task['text'] = text
         if 'id' not in task:
             task['id'] = _hash(text)
-
-    def show_task(self, prefix):
-        """Show the task with the given prefix.
-
-        If more than one task matches the prefix an AmbiguousPrefix exception
-        will be raised, unless the prefix is the entire ID of one task.
-
-        If no tasks match the prefix an UnknownPrefix exception will be raised.
-
-        """
-        task = self[prefix]
-        print(task['text'])
 
     def add_tag(self, task, tag):
         """Add tag to the the task with the given prefix.
@@ -304,7 +307,7 @@ class TaskDict(object):
         self.tasks.pop(self[prefix]['id'])
 
 
-    def print_list(self, kind='tasks', verbose=False, quiet=False, grep=''):
+    def print_list(self, kind='tasks', verbose=False, quiet=False, grep='', parent_id=None, indent=""):
         """Print out a nicely formatted list of unfinished tasks."""
         tasks = dict(getattr(self, kind).items())
         label = 'prefix' if not verbose else 'id'
@@ -319,12 +322,14 @@ class TaskDict(object):
         plen = max(map(lambda t: len(t[label]), tasks.values())) if tasks else 0
         for task in sorted(tasks.values(), key=lambda t:t['timestamp']):
             if grep.lower() in task['text'].lower():
-                p = '%s - ' % task[label].ljust(plen) if not quiet else ''
-                if 'tags' in task:
-                    tags_str = " ".join(["[%s]" % tag for tag in task['tags']]) + " "
-                else:
-                    tags_str = ""
-                print(p + tags_str + task['text'])
+                if parent_id == task['parent_id']:
+                    p = '%s - ' % task[label].ljust(plen) if not quiet else ''
+                    if 'tags' in task:
+                        tags_str = " ".join(["[%s]" % tag for tag in task['tags']]) + " "
+                    else:
+                        tags_str = ""
+                    print(indent + p + tags_str + task['text'])
+                    self.print_list(kind, verbose, quiet, grep, task['id'], indent + "  ")
 
     def write(self, delete_if_empty=False):
         """Flush the finished and unfinished tasks to the files on disk."""
@@ -365,8 +370,8 @@ def _build_parser():
                        help="mark TASK as finished", metavar="TASK")
     actions.add_option("-r", "--remove", dest="remove",
                        help="Remove TASK from list", metavar="TASK")
-    actions.add_option("-s", "--show", dest="show",
-                       help="show TASK from list", metavar="TASK")
+    actions.add_option("-s", "--sub", dest="sub",
+                       help="add sub task to PARENT", metavar="PARENT")
     actions.add_option("-x", "--tag", dest="tag",
                        help="add tag to TASK", metavar="TASK")
     parser.add_option_group(actions)
@@ -417,16 +422,11 @@ def _main():
         elif options.edit:
             td.edit_task(options.edit, text)
             td.write(options.delete)
-        elif options.show:
-            td.show_task(options.show)
         elif options.tag:
             td.tag(options.tag, text)
             td.write(options.delete)
-        elif options.add:
-            td.add_task(text, verbose=options.verbose, quiet=options.quiet, task_id=options.add)
-            td.write(options.delete)
         elif text:
-            td.add_task(text, verbose=options.verbose, quiet=options.quiet)
+            td.add_task(text, verbose=options.verbose, quiet=options.quiet, task_id=options.add, parent_id=options.sub)
             td.write(options.delete)
         else:
             kind = 'tasks' if not options.done else 'done'
