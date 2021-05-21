@@ -1,9 +1,17 @@
 t
 =======
+A simple command-line todo manager.
 
-`t` is a command-line todo list manager for people that want to *finish* tasks,
-not organize them.
+This is a fork of this [Mercurial repository][] (and [git mirror][])
 
+[Mercurial repository]: https://hg.stevelosh.com/t/
+[git mirror]: http://github.com/sjl/t/
+
+With the following changes:
+- task id is not modified by an edit
+- tasks are sorted by when they were added
+- added --add-task (-a) option which allows specifying the task id at creation (which I use to tie a task to our company's bug tracking system)
+- added --tag (-x) option whivh allows adding/removing tags on a task (which I use to keep track of various work milestones: e.g. branched, PR, port-to-foo)
 
 Why t?
 ------
@@ -105,6 +113,12 @@ To add a task, use `t [task description]`:
     $ t Buy more beer.
     $
 
+To specify an id when adding a task, use `t -a ID [task desription]`:
+
+    $ t -a 123 fix formatting bug
+    $ t -a bz456 fix bugzilla bug number 456
+    $
+
 ### List Your Tasks
 
 Listing your tasks is even easier -- just use `t`:
@@ -116,6 +130,31 @@ Listing your tasks is even easier -- just use `t`:
     $
 
 `t` will list all of your unfinished tasks and their IDs.
+
+### Add a tag
+
+To add a tag to a task, use `t -x ID TAG`:
+
+    $ t -x 123 PR
+    $ t
+    123 - [PR] fix formatting bug
+    $
+
+You can add more than one tag at a time:
+
+    $ t -x 123 PR PROJ_FOO
+    $ t
+    123 - [PR] [PROJ_FOO] fix formatting bug
+    $
+
+### Remove a tag
+
+To remove a tag from a task, use the same syntax as adding a tag but prefix the TAG with a -
+
+    $ t -x 123 -- -PR
+    $ t
+    123 - fix formatting bug
+    $
 
 ### Finish a Task
 
