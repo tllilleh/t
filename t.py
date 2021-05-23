@@ -285,7 +285,13 @@ class TaskDict(object):
             else:
                 self.add_tag(task, tag)
 
-    def finish_task(self, prefix):
+    def children(self, task):
+        return [self.tasks[t] for t in self.tasks if 'parent_id' in self.tasks[t] and self.tasks[t]['parent_id'] == task['id']]
+
+    def num_children(self, task):
+        return len(self.children(task))
+
+    def finish_task(self, prefix, force = False):
         """Mark the task with the given prefix as finished.
 
         If more than one task matches the prefix an AmbiguousPrefix exception
@@ -293,8 +299,16 @@ class TaskDict(object):
         be raised.
 
         """
+
+        if not force and self.num_children(self[prefix]) > 0:
+            print('cannot finish task - it has open sub-tasks. use --force to override.\n')
+            return
+
         task = self.tasks.pop(self[prefix]['id'])
         self.done[task['id']] = task
+
+        for child in self.children(task):
+            self.finish_task(child['id'])
 
     def remove_task(self, prefix):
         """Remove the task from tasks list.
@@ -323,12 +337,13 @@ class TaskDict(object):
         for task in sorted(tasks.values(), key=lambda t:t['timestamp']):
             if grep.lower() in task['text'].lower():
                 if parent_id == task['parent_id']:
+                    num_str = "(%d) " % self.num_children(task)
                     p = '%s - ' % task[label].ljust(plen) if not quiet else ''
                     if 'tags' in task:
                         tags_str = " ".join(["[%s]" % tag for tag in task['tags']]) + " "
                     else:
                         tags_str = ""
-                    print(indent + p + tags_str + task['text'])
+                    print(indent + num_str + p + tags_str + task['text'])
                     self.print_list(kind, verbose, quiet, grep, task['id'], indent + "  ")
 
     def write(self, delete_if_empty=False):
@@ -374,6 +389,9 @@ def _build_parser():
                        help="add sub task to PARENT", metavar="PARENT")
     actions.add_option("-x", "--tag", dest="tag",
                        help="add tag to TASK", metavar="TASK")
+    actions.add_option("--force",
+                       action="store_true", dest="force", default=False,
+                       help="used to force an action even if it is not recommended")
     parser.add_option_group(actions)
 
     config = OptionGroup(parser, "Configuration Options")
@@ -414,10 +432,10 @@ def _main():
 
     try:
         if options.finish:
-            td.finish_task(options.finish)
+            td.finish_task(options.finish, force=options.force)
             td.write(options.delete)
         elif options.remove:
-            td.remove_task(options.remove)
+            td.remove_task(options.remove, force=options.force)
             td.write(options.delete)
         elif options.edit:
             td.edit_task(options.edit, text)
